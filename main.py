@@ -1,3 +1,4 @@
+from pyparsing import Opt
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from fake_useragent import UserAgent
@@ -5,52 +6,20 @@ from bs4 import BeautifulSoup
 import time
 import random
 import json
-import re
 
-
-airport_code = {
-    'atl': "Hartsfield-Jackson International Airport",
-    'dfw': "Dallas/Fort Worth International Airport",
-    'den': "Denver International Airport",
-    'ord': "O'Hare International Airport",
-    'lax': "Los Angeles International Airport",
-    'clt': "Charlotte Douglas International Airport",
-    'las': "Harry Reid International Airport",
-    'phx': "Phoenix Sky Harbor International Airport",
-    'mco': "Orlando International Airport",
-    'sea': "Seattle–Tacoma International Airport",
-    'mia': "Miami International Airport",
-    'iah': "George Bush Intercontinental Airport",
-    'jfk': "John F. Kennedy International Airport",
-    'fll': "Fort Lauderdale–Hollywood International Airport",
-    'ewr': "Newark Liberty International Airport",
-    'sfo': "San Francisco International Airport",
-    'msp': "Minneapolis–Saint Paul International Airport",
-    'dtw': "Detroit Metropolitan Airport",
-    'bos': "Logan International Airport",
-    'slc': "Salt Lake City International Airport",
-    'phl': "Philadelphia International Airport",
-    'bwi': "Baltimore/Washington International Airport",
-    'tpa': "Tampa International Airport",
-    'san': "San Diego International Airport",
-    'mdw': "Midway International Airport",
-    'lga': "LaGuardia Airport",
-    'bna': "Nashville International Airport",
-    'iad': "Washington Dulles International Airport"
-}
+from valid import is_valid
+from jsontoexcel import to_excel
+from our_airs import airport_code
 
 # options
 options_ = webdriver.FirefoxOptions()
+options_.headless = True
 options_.set_preference("general.useragent.override", UserAgent().random)
     
 # browser
 driver = webdriver.Firefox(options= options_)
 
-
-password = "Qazwsx_00"
-login = "choponov.099@gmail.com"
-
-
+coincidence = dict()
 try:
     def get_html(code): 
         link = f"https://www.flightradar24.com/data/airports/{code}/departures"
@@ -89,7 +58,12 @@ try:
             a_s = soup.select("tbody > tr > td:nth-child(3) > div:nth-child(1) > a:nth-child(2)")
             airs = set()
             for air in a_s:
-                airs.add(f'{air.attrs["title"]}{air.text}')
+                if is_valid(air.attrs["title"],air.text):
+                    try:
+                        coincidence[f'{air.attrs["title"]}{air.text}'] += 1
+                    except KeyError:
+                        coincidence[f'{air.attrs["title"]}{air.text}'] = 1
+                    airs.add(f'{air.attrs["title"]}{air.text}')
         return list(airs)
     
     json_ = dict()
@@ -102,13 +76,18 @@ try:
             get_html(code)
             res = parse_html(f"data/{code}.html")
         w = f"{airport_code[code]}({code.upper()})"
-        print(w)
         json_[w] = res
         print(f"{it}/{size}")
         it += 1
 
-    with open("res.json", "w", encoding="utf-8") as f:
+    with open("json/result.json", "w", encoding="utf-8") as f:
         json.dump(json_,f,indent=4, ensure_ascii=False)
+
+    with open("json/final.json", "w", encoding="utf-8") as f:
+        json.dump(coincidence,f,indent=4, ensure_ascii=False)
+
+    # to_excel("result")
+    # to_excel("final")
 
 except Exception as e:
     raise
